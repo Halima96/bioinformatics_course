@@ -1,0 +1,125 @@
+#organizing_data: 
+cd ~/ngs_course
+mkdir dnaseq_pipeline
+cd ~/ngs_course/dnaseq_pipeline
+mkdir data meta results logs scripts
+cd ~/ngs_course/dnaseq_pipeline/data
+mkdir trimmed_fastq
+mkdir untrimmed_fastq
+wget https://s3-eu-west-1.amazonaws.com/workshopdata2017/NGS0001.R1.fastq.qz
+wget https://s3-eu-west-1.amazonaws.com/workshopdata2017/NGS0001.R2.fastq.qz
+wget https://s3-eu-west-1.amazonaws.com/workshopdata2017/annotation.bed 
+mv *fastq.qz ~/ngs_course/dnaseq_pipeline/data/untrimmed_fastq
+mv annotation.bed ~/ngs_course/dnaseq_pipeline/data
+wget http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz
+mv hg19.fa.gz ~/ngs_course/dnaseq_pipeline/data/
+
+#tools_are_expected_to_be_already_downloaded 
+
+
+
+#quality
+cd ~/ngs_course/dnaseq_pipeline/data/untrimmed_fastq
+mv  NGS0001.R1.fastq.qz  NGS0001.R1.fastq.gz
+mv  NGS0001.R2.fastq.qz  NGS0001.R2.fastq.gz
+fastqc *.fastq.qz
+
+ mkdir ~/ngs_course/dnaseq_pipeline/results/fastqc_untrimmed_reads
+
+
+
+
+#trimming :
+trimmomatic PE  \
+  -threads 4 \
+  -phred33 \
+  /home/ubuntu/ngs_course/dnaseq_pipeline/data/untrimmed_fastq/NGS0001.R1.fastq.gz /home/ubuntu/ngs_course/dnaseq_pipeline/data/untrimmed_fastq/NGS0001.R2.fastq.gz \
+
+  -baseout /home/ubuntu/ngs_course/dnaseq_pipeline/data/trimmed_fastq/NGS0001_trimmed_R \
+  
+ILLUMINACLIP:/home/ubuntu/anaconda3/pkgs/trimmomatic-0.39-1/share/trimmomatic-0.39-1/adapters/NexteraPE-PE.fa:2:30:10 \
+  TRAILING:25 MINLEN:50
+
+#Alignment:
+mkdir -p ~/ngs_course/dnaseq_pipeline/data/reference
+
+mv ~/ngs_course/dnaseq_pipeline/data/hg19.fa.gz ~/ngs_course/dnaseq_pipeline/data/reference/
+
+bwa index ~/ngs_course/dnaseq_pipeline/data/reference/hg19.fa.gz
+
+mkdir ~/ngs_course/dnaseq_pipeline/data/aligned_data
+
+rm -r untrimmed_data
+
+
+bwa mem -t 4 -v 1 -R '@RG\tID:HWI-D0011.50.H7AP8ADXX.1.NGS0001\tSM:NGS0001\tPL:ILLUMINA\tLB:nextera-ngs0001-blood\tDT:2017-02-23\tPU:HWI-D00119' -I 250,50  ~/ngs_course/dnaseq_pipeline/data/reference/hg19.fa.gz ~/ngs_course/dnaseq_pipeline/data/trimmed_fastq/NGS0001_trimmed_R_1P.fastq ~/ngs_course/dnaseq_pipeline/data/trimmed_fastq/NGS0001_trimmed_R_2P.fastq > ~/ngs_course/dnaseq_pipeline/data/aligned_data/NGS0001.sam   
+
+
+cd ~/ngs_course/dnaseq_pipeline/data/aligned_data
+
+samtools view -h -b NGS0001.sam > NGS0001.bam
+
+rm –r NGS0001.sam
+
+samtools sort NGS0001.bam > NGS0001_sorted.bam
+
+samtools index NGS0001_sorted.bam
+
+rm -r NGS0001.bam
+
+Mark duplicates 
+picard MarkDuplicates I=NGS0001_sorted.bam O=NGS0001_sorted_marked.bam M=marked_dup_metrics.txt
+
+samtools index NGS0001_sorted_marked.bam
+
+rm -r NGS0001_sorted.bam
+
+samtools view -F 1796  -q 20 -o NGS0001_sorted_filtered.bam NGS0001_sorted_marked.bam
+
+samtools index NGS0001_sorted_filtered.bam
+
+
+
+#variants calling anf filetring 
+zcat ~/ngs_course/dnaseq_pipeline/data/reference/hg19.fa.gz > ~/ngs_course/dnaseq_pipeline/data/reference/hg19.fa 
+
+samtools faidx ~/ngs_course/dnaseq_pipeline/data/reference/hg19.fa
+
+
+freebayes --bam ~/ngs_course/dnaseq_pipeline/data/aligned_data/NGS0001_sorted_filtered.bam --fasta-reference ~/ngs_course/dnaseq_pipeline/data/reference/hg19.fa --vcf ~/ngs_course/dnaseq_pipeline/results/NGS0001.vcf
+
+bgzip ~/ngs_course/dnaseq_pipeline/results/NGS0001.vcf
+
+tabix -p vcf ~/ngs_course/dnaseq_pipeline/results/NGS0001.vcf.gz
+
+
+#filtering the VCF: 
+vcffilter -f "QUAL > 1 & QUAL / AO > 10 & SAF > 0 & SAR > 0 & RPR > 1 & RPL > 1" ~/ngs_course/dnaseq_pipeline/results/NGS0001.vcf.gz > ~/ngs_course/dnaseq_pipeline/results/NGS0001_filtered.vcf
+
+bedtools intersect -header -wa -a ~/ngs_course/dnaseq_pipeline/results/NGS0001_filtered.vcf -b ../annotation.bed > ~/ngs_course/dnaseq_pipeline/results/NGS0001_filtered_output.vcf
+
+
+bgzip ~/ngs_course/dnaseq_pipeline/results/NGS0001_filtered_output.vcf
+
+tabix -p vcf ~/ngs_course/dnaseq_pipeline/results/NGS0001_filtered_output.vcf.gz
+
+
+
+
+#annovar
+
+tar -zxvf annovar.latest.tar.gz
+
+cd ~/ngs_course/annovar
+./annotate_variation.pl -buildver hg19 -downdb -webfrom annovar knownGene humandb/
+./annotate_variation.pl -buildver hg19 -downdb -webfrom annovar refGene humandb/
+./annotate_variation.pl -buildver hg19 -downdb -webfrom annovar ensGene humandb/
+./annotate_variation.pl -buildver hg19 -downdb -webfrom annovar clinvar_20180603 humandb/
+./annotate_variation.pl -buildver hg19 -downdb -webfrom annovar exac03 humandb/
+./annotate_variation.pl -buildver hg19 -downdb -webfrom annovar dbnsfp31a_interpro humandb/
+
+
+./convert2annovar.pl -format vcf4 ~/ngs_course/dnaseq_pipeline/results/NGS0001_filtered_output.vcf.gz > ~/ngs_course/dnaseq_pipeline/results/NGS0001_filtered_output.avinput
+
+
+./table_annovar.pl ~/ngs_course/dnaseq_pipeline/results/NGS0001_filtered_output.avinput humandb/ -buildver hg19  \                   -out ~/ngs_course/dnaseq_pipeline/results/NGS0001_filtered_output -remove   \                                                       -protocol refGene,ensGene,clinvar_20180603,exac03,dbnsfp31a_interpro, -operation g,g,f,f,f -otherinfo -nastring . -csvout
