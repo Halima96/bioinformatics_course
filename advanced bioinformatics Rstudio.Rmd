@@ -1,0 +1,70 @@
+---
+title: "Advanced Bioinformatics 2019 assessment"
+author: "m1807133"
+date: "03/05/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+Task1
+```{r}
+sum(seq(5,55))
+```
+
+Task2:function called sumfun with one input parameter, called n, that calculates the sum of all integers between 5 and n. 
+```{r}
+sumfun <-function(n)sum(seq(5,n))
+
+sumfun(10)
+sumfun(20)
+sumfun(100)
+```
+
+```
+Task3The famous Fibonacci series is calculated as the sum of the two preceding members of the sequence, where the first two steps in the sequence are 1, 1. Write an R script using a for loop to calculate and print out the first 12 entries of the Fibonacci series. 
+```{r}
+```{r}
+length =(12)
+vals <- numeric(length)
+vals[1] <- 1
+vals[2] <- 1
+for(n in 3:length) { vals[n] <- vals[n-1] + vals[n-2] }
+vals
+```
+
+```
+
+Task4
+ With the mtcars dataset bundled with R, use ggplot to generate a box of miles per gallon (in the variable mpg) as a function of the number of gears (in the variable gear). 
+```
+```{r}
+library(ggplot2)
+ggplot(data = mtcars, aes(x= as.factor(gear), y= mpg)) + geom_boxplot(aes(fill= as.factor(gear) )) + ggtitle(" Box plot of Miles per gallon(mpg) as a function of gears")
+
+```
+
+Task5
+```{r}
+y <- cars $dist; x <- cars $speed; 
+model <- lm(formula = "y ~ x")
+summary(model)
+```
+Task 6:
+```{r}
+library(ggplot2) 
+
+ggplot_1.0 <- ggplot(data = cars, aes(x= speed, y=dist)) + geom_point() + geom_smooth(method = "lm",formula = "y ~ x")
+
+ggplot_1.1 <- ggplot_1.0 + ggtitle ("Linear model of the relationship between breaking distance(dist) and speed")+ xlab("speed(milesperhour)")+ ylab("dist(feet)")
+ggplot_1.1
+```
+
